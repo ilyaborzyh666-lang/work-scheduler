@@ -1,0 +1,130 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // פונקציות עזר
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function getRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isManager() {
+      return isAuth() && getRole() in ['manager', 'ceo'];
+    }
+
+    function isShiftManager() {
+      return isAuth() && getRole() == 'shift_manager';
+    }
+
+    function isManagerOrShiftManager() {
+      return isAuth() && getRole() in ['manager', 'ceo', 'shift_manager'];
+    }
+
+    // שדות שעובד לא רשאי לשנות בעצמו
+    function noPrivilegedFields() {
+      return !request.resource.data.diff(resource.data)
+        .affectedKeys()
+        .hasAny(['role', 'isBlocked', 'blockOverride', 'weeklyHours', 'shiftManagerId']);
+    }
+
+    // ── Users ──────────────────────────────────────────────────────────
+    match /users/{userId} {
+      // כל מחובר יכול לקרוא — צריך לראות שמות עובדים
+      allow read: if isAuth();
+
+      // יצירת משתמש חדש — רק על עצמו, רק תפקידי עובד (כולל Google Sign-In)
+      allow create: if isAuth()
+        && request.auth.uid == userId
+        && request.resource.data.role in ['doctor', 'nurse', 'caregiver']
+        && request.resource.data.id == request.auth.uid;
+
+      // עובד יכול לעדכן רק את עצמו, ורק שדות לא רגישים
+      allow update: if isAuth()
+        && request.auth.uid == userId
+        && noPrivilegedFields();
+
+      // מנהל יכול לעדכן כל שדה על כל משתמש
+      allow update: if isManager();
+
+      // אין מחיקת משתמשים
+      allow delete: if false;
+    }
+
+    // ── Shifts ─────────────────────────────────────────────────────────
+    match /shifts/{shiftId} {
+      // כולם יכולים לקרוא משמרות
+      allow read: if isAuth();
+
+      // עובד יכול ליצור בקשת משמרת — רק בשמו שלו
+      allow create: if isAuth()
+        && request.resource.data.employeeId == request.auth.uid
+        && request.resource.data.status == 'pending';
+
+      // מנהל ומנהל משמרת יכולים לעדכן (אישור/דחייה/עריכה)
+      allow update: if isManagerOrShiftManager();
+
+      // עובד יכול למחוק רק את הבקשה שלו בסטטוס pending
+      allow delete: if isAuth()
+        && resource.data.employeeId == request.auth.uid
+        && resource.data.status == 'pending';
+
+      // מנהל יכול למחוק כל משמרת
+      allow delete: if isManager();
+    }
+
+    // ── Leaves ─────────────────────────────────────────────────────────
+    match /leaves/{leaveId} {
+      allow read: if isAuth();
+
+      // עובד יכול ליצור בקשת חופשה רק בשמו
+      allow create: if isAuth()
+        && request.resource.data.employeeId == request.auth.uid
+        && request.resource.data.status == 'pending';
+
+      // רק מנהלים יכולים לאשר/לדחות
+      allow update: if isManagerOrShiftManager();
+
+      // עובד יכול למחוק את הבקשה שלו בסטטוס pending בלבד
+      allow delete: if isAuth()
+        && resource.data.employeeId == request.auth.uid
+        && resource.data.status == 'pending';
+    }
+
+    // ── Notifications ──────────────────────────────────────────────────
+    match /notifications/{notifId} {
+      // קריאה — רק ההתראות שלך
+      allow read: if isAuth()
+        && resource.data.userId == request.auth.uid;
+
+      // יצירה — רק המערכת (דרך מנהלים/שירותים)
+      allow create: if isManagerOrShiftManager();
+
+      // עדכון (סימון כנקרא) — רק הבעלים
+      allow update: if isAuth()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+
+      allow delete: if false;
+    }
+
+    // ── Loan Requests ──────────────────────────────────────────────────
+    match /loanRequests/{loanId} {
+      allow read: if isManagerOrShiftManager();
+
+      // רק מנהל משמרת יכול ליצור בקשת השאלה
+      allow create: if isShiftManager()
+        && request.resource.data.fromManagerId == request.auth.uid;
+
+      // מנהל משמרת יכול לעדכן רק בקשות שקשורות אליו
+      allow update: if isShiftManager()
+        && (resource.data.fromManagerId == request.auth.uid
+            || resource.data.toManagerId == request.auth.uid);
+
+      allow delete: if isManager();
+    }
+
+  }
+}
