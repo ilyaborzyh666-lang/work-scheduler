@@ -1,88 +1,175 @@
-# Work Scheduler
+<div align="center">
 
-A full-stack work scheduling application built for managing employee shifts, leave requests, and notifications across a healthcare-style organization.
+# 🗓️ Work Scheduler
 
-## What it does
+### The shift management platform built for healthcare teams — from the manager's desk to every caregiver's pocket.
 
-Employees log in and view their shifts, submit leave requests, and receive real-time notifications when shifts are approved or rejected. Managers and shift managers can approve/reject shifts and leaves, manage their team, and loan employees to other shift managers. The app enforces business rules such as a 60-hour weekly cap, minimum 8-hour rest between shifts, and shift capacity limits per type.
+[![React Native](https://img.shields.io/badge/React_Native-Expo_SDK_54-000020?style=flat-square&logo=expo&logoColor=white)](https://expo.dev)
+[![Firebase](https://img.shields.io/badge/Firebase-Firestore-FF6F00?style=flat-square&logo=firebase&logoColor=white)](https://firebase.google.com)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://typescriptlang.org)
+
+**[Features](#features) · [Architecture](#architecture) · [Quick Start](#quick-start) · [API Reference](#api-reference)**
+
+</div>
+
+---
+
+## The Problem
+
+Running shifts in a healthcare facility means coordinating dozens of people across morning, afternoon, and night rotations — while enforcing rest rules, tracking hours, handling leave requests, and making sure no shift is understaffed.
+
+Most teams still do this in spreadsheets. **Work Scheduler replaces the spreadsheet.**
+
+Managers approve shifts in one tap. Employees see their schedule the moment it's published. Leave requests flow through a proper approval chain. And the system automatically enforces every labour rule so no one accidentally works 70 hours a week.
+
+---
+
+## Features
+
+### 👥 Role-based access
+- **CEO** — full visibility and control across the entire organisation
+- **Manager** — manage all employees and shifts, override rules when needed
+- **Shift Manager** — manage their own team, loan employees to other managers
+- **Doctors / Nurses / Caregivers** — view their schedule, submit leave requests
+
+### 📅 Shift management
+- Morning, afternoon, and night rotations with fixed hours
+- Capacity limits enforced automatically (morning ≤ 6, afternoon ≤ 4, night ≤ 1)
+- Approve or reject shifts with real-time notification to the employee
+- Employee loan system — shift managers can temporarily share staff
+
+### 🏖️ Leave requests
+- Short leave (≤ 2 days): 2-day advance notice required
+- Long leave (> 2 days): 30-day advance notice required
+- Full approval/rejection flow with push notification on decision
+
+### 🔔 Real-time notifications
+- Live badge count on the notifications tab
+- Alerts for shift approval/rejection, leave approval/rejection, and hours limit warnings
+- Built on Firestore `onSnapshot` — updates appear instantly without polling
+
+### 🌍 Bilingual
+- Full Hebrew and English support via i18next
+- Toggle language at any time from the app header
+
+### 🛡️ Business rule enforcement
+- 60-hour weekly cap per employee
+- Minimum 8 hours rest between consecutive shifts
+- Automatic blocking with manager override capability
+
+---
 
 ## Architecture
 
 ```
-WorkScheduler/
-├── src/                        # React Native (Expo) frontend
-│   ├── context/AuthContext.tsx  # Global auth state via Firebase Auth
-│   ├── navigation/              # Stack + Bottom Tab navigator
-│   ├── screens/                 # One folder per feature
-│   │   ├── auth/                # Login, Register
-│   │   ├── dashboard/           # Calendar view of shifts
-│   │   ├── shifts/              # Shift list, approve/reject
-│   │   ├── employees/           # Team management
-│   │   ├── leaves/              # Leave requests
-│   │   └── notifications/       # Real-time notifications
-│   ├── services/                # Firebase + API calls (one file per domain)
-│   ├── types/index.ts           # All shared types and business rule constants
-│   ├── i18n/                    # Hebrew + English translations
-│   └── utils/                   # Date helpers, responsive sizing
-├── backend/                    # Python FastAPI backend
-│   ├── main.py                  # App entry, CORS, router registration
-│   ├── routes/                  # shifts.py, leaves.py, employees.py
-│   ├── services/                # Business logic layer
-│   ├── auth.py                  # Firebase Admin token verification
-│   └── models.py                # Pydantic request/response models
-└── assets/                     # App icons and splash screen
+┌─────────────────────────────────────────────────────────┐
+│              React Native (Expo) — Web / iOS / Android  │
+│                                                         │
+│  LoginScreen  RegisterScreen  DashboardScreen           │
+│  ShiftsScreen  EmployeesScreen  LeavesScreen            │
+│  NotificationsScreen                                    │
+└──────────────┬──────────────────────┬───────────────────┘
+               │ onSnapshot (realtime)│ HTTPS / JSON
+               ▼                      ▼
+┌──────────────────────┐  ┌──────────────────────────────┐
+│   Firebase           │  │   FastAPI Backend (Python)   │
+│                      │  │                              │
+│  Firestore           │  │  /shifts                     │
+│  ├── users           │  │  /leaves                     │
+│  ├── shifts          │  │  /employees                  │
+│  ├── leaveRequests   │  │                              │
+│  ├── notifications   │  │  auth.py  — Firebase Admin   │
+│  └── loanRequests    │  │  services/ — business logic  │
+│                      │  │  models/  — Pydantic schemas │
+│  Firebase Auth       │  └──────────────────────────────┘
+└──────────────────────┘
 ```
 
-### Tech stack
+---
+
+## Tech Stack
 
 | Layer | Technology |
-|---|---|
-| Frontend | React Native + Expo (web, Android, iOS) |
-| Backend | Python FastAPI |
-| Database | Firebase Firestore |
+|-------|-----------|
+| Frontend | React Native · Expo SDK 54 · TypeScript |
+| Navigation | React Navigation (Stack + Bottom Tabs) |
+| Backend | Python · FastAPI |
+| Database | Firebase Firestore (real-time) |
 | Auth | Firebase Authentication |
-| Navigation | React Navigation (stack + bottom tabs) |
-| i18n | i18next (Hebrew / English) |
+| i18n | i18next (Hebrew + English) |
+| Notifications | Expo Push Notifications + Firestore listeners |
 
-### User roles
+---
 
-| Role | Permissions |
-|---|---|
-| `ceo` | Full access to everything |
-| `manager` | Manage all employees and shifts |
-| `shift_manager` | Manage their own team, loan employees |
-| `doctor` / `nurse` / `caregiver` | View own shifts, submit leave requests |
+## User Roles
 
-### Business rules (enforced in code)
+| Role | Can approve shifts | Can manage employees | Can loan staff |
+|------|:-----------------:|:-------------------:|:--------------:|
+| `ceo` | ✅ | ✅ | ✅ |
+| `manager` | ✅ | ✅ | ✅ |
+| `shift_manager` | ✅ (own team) | ✅ (own team) | ✅ |
+| `doctor` / `nurse` / `caregiver` | ❌ | ❌ | ❌ |
 
-- Max **60 hours/week** per employee
-- Minimum **8 hours rest** between shifts
-- Shift capacity: morning ≤ 6, afternoon ≤ 4, night ≤ 1
-- Short leave (≤ 2 days): 2-day advance notice required
-- Long leave (> 2 days): 30-day advance notice required
+---
 
-## Getting started
+## Business Rules
 
-### Frontend
+| Rule | Value |
+|------|-------|
+| Max weekly hours | 60 h |
+| Min rest between shifts | 8 h |
+| Morning shift capacity | 6 employees |
+| Afternoon shift capacity | 4 employees |
+| Night shift capacity | 1 employee |
+| Short leave notice | 2 days |
+| Long leave notice | 30 days |
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+| Tool | Version |
+|------|---------|
+| Node.js | 18+ |
+| Python | 3.11+ |
+| Expo Go | Latest |
+| Firebase project | (free tier works) |
+
+### 1. Frontend
 
 ```bash
-cp .env.example .env   # fill in your Firebase credentials
+git clone https://github.com/ilyaborzyh666-lang/work-scheduler.git
+cd work-scheduler
+
 npm install
+
+cp .env.example .env
+# Fill in your Firebase credentials (see Environment Variables below)
+
 npx expo start --web
 ```
 
-### Backend
+### 2. Backend
 
 ```bash
 cd backend
-cp .env.example .env   # fill in Firebase Admin SDK credentials
+
 pip install -r requirements.txt
+
+cp .env.example .env
+# Fill in Firebase Admin SDK credentials
+
 uvicorn main:app --reload
 ```
 
-## Environment variables
+> API docs: **http://localhost:8000/docs**
 
-```
+### Environment Variables
+
+```env
 EXPO_PUBLIC_FIREBASE_API_KEY=
 EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=
 EXPO_PUBLIC_FIREBASE_PROJECT_ID=
@@ -90,3 +177,72 @@ EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=
 EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 EXPO_PUBLIC_FIREBASE_APP_ID=
 ```
+
+---
+
+## API Reference
+
+<details>
+<summary>View all endpoints</summary>
+
+| Method | Endpoint | Auth | Description |
+|--------|----------|:----:|-------------|
+| `GET` | `/health` | — | Health check |
+| `GET` | `/shifts` | ✓ | List shifts (filtered by role) |
+| `POST` | `/shifts` | ✓ | Create shift |
+| `PATCH` | `/shifts/{id}` | ✓ | Approve / reject shift |
+| `GET` | `/leaves` | ✓ | List leave requests |
+| `POST` | `/leaves` | ✓ | Submit leave request |
+| `PATCH` | `/leaves/{id}` | ✓ | Approve / reject leave |
+| `GET` | `/employees` | ✓ | List employees (manager/ceo only) |
+| `PATCH` | `/employees/{id}` | ✓ | Block / unblock employee |
+
+</details>
+
+---
+
+## Project Structure
+
+```
+work-scheduler/
+├── src/
+│   ├── context/
+│   │   └── AuthContext.tsx       ← Global auth state (Firebase onAuthStateChanged)
+│   ├── navigation/
+│   │   └── AppNavigator.tsx      ← Stack + Tab navigator, role-based tab visibility
+│   ├── screens/
+│   │   ├── auth/                 ← Login, Register
+│   │   ├── dashboard/            ← Calendar view of shifts
+│   │   ├── shifts/               ← Shift list, approve/reject, loan system
+│   │   ├── employees/            ← Team management, block/unblock
+│   │   ├── leaves/               ← Leave request flow
+│   │   └── notifications/        ← Real-time notification feed
+│   ├── services/
+│   │   ├── firebase.ts           ← Firestore + Auth init
+│   │   ├── authService.ts        ← Login, logout, profile fetch
+│   │   ├── shiftService.ts       ← Shift CRUD + approval
+│   │   ├── leaveService.ts       ← Leave CRUD + approval
+│   │   ├── userService.ts        ← User management
+│   │   └── loanService.ts        ← Employee loan system
+│   ├── types/index.ts            ← All shared types + business rule constants
+│   ├── i18n/                     ← he.ts + en.ts translations
+│   └── utils/                    ← Date helpers, responsive sizing
+├── backend/
+│   ├── main.py                   ← FastAPI app, CORS, router registration
+│   ├── auth.py                   ← Firebase Admin token verification
+│   ├── models.py                 ← Pydantic request/response models
+│   ├── routes/
+│   │   ├── shifts.py
+│   │   ├── leaves.py
+│   │   └── employees.py
+│   └── services/
+│       ├── shift_service.py      ← Business logic + rule enforcement
+│       └── leave_service.py
+└── assets/                       ← Icons, splash screen
+```
+
+---
+
+## License
+
+MIT © 2025
