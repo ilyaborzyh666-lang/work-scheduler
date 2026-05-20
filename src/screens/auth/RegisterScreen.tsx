@@ -10,19 +10,13 @@ import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types';
 import { colors, spacing, radius, typography, shadow, MIN_TOUCH } from '../../theme';
 
-const JOB_ROLES: { role: UserRole; label: string }[] = [
-  { role: 'doctor', label: 'רופא/ה' },
-  { role: 'nurse', label: 'אח/אחות' },
-  { role: 'caregiver', label: 'מטפל/ת' },
-];
-
 export default function RegisterScreen({ navigation }: any) {
   const { t } = useTranslation();
   const { setUser } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [selectedRole, setSelectedRole] = useState<UserRole>('caregiver');
+  const selectedRole: UserRole = 'caregiver';
   const [loading, setLoading] = useState(false);
 
   async function handleRegister() {
@@ -88,21 +82,6 @@ export default function RegisterScreen({ navigation }: any) {
             autoCapitalize="none"
             textAlign="right"
           />
-
-          <Text style={styles.label}>תפקיד</Text>
-          <View style={styles.roleRow}>
-            {JOB_ROLES.map(({ role, label }) => (
-              <TouchableOpacity
-                key={role}
-                style={[styles.roleBtn, selectedRole === role && styles.roleBtnActive]}
-                onPress={() => setSelectedRole(role)}
-              >
-                <Text style={[styles.roleBtnText, selectedRole === role && styles.roleBtnTextActive]}>
-                  {label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
 
           <Text style={styles.label}>{t('auth.password')}</Text>
           <TextInput
@@ -182,13 +161,4 @@ const styles = StyleSheet.create({
   linkRow: { marginTop: spacing.md, alignItems: 'center' },
   link: { ...typography.caption, color: colors.textSecondary, textAlign: 'center' },
   linkBold: { color: colors.primary, fontWeight: '700' },
-  roleRow: { flexDirection: 'row-reverse', gap: spacing.sm, marginBottom: spacing.xs },
-  roleBtn: {
-    flex: 1, borderWidth: 1, borderColor: colors.border,
-    borderRadius: radius.sm, paddingVertical: spacing.sm,
-    alignItems: 'center',
-  },
-  roleBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  roleBtnText: { ...typography.caption, color: colors.textPrimary, fontWeight: '600' },
-  roleBtnTextActive: { color: '#fff' },
 });
