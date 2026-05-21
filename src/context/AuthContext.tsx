@@ -21,7 +21,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // טפל בחזרה מ-Google redirect (מובייל)
     handleGoogleRedirectResult().catch(() => {});
 
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {

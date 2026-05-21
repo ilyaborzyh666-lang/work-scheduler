@@ -25,7 +25,7 @@ export async function searchUnassignedEmployeesByName(name: string): Promise<Use
 }
 
 export async function getAllEmployees(): Promise<User[]> {
-  const q = query(collection(db, 'users'), where('role', 'in', ['doctor', 'nurse', 'caregiver']));
+  const q = query(collection(db, 'users'), where('role', 'in', ['manager', 'shift_manager', 'doctor', 'nurse', 'caregiver']));
   const snap = await getDocs(q);
   return snap.docs.map(d => d.data() as User);
 }
