@@ -10,6 +10,20 @@ import {
 import { db } from './firebase';
 import { User } from '../types';
 
+export async function searchUnassignedEmployeesByName(name: string): Promise<User[]> {
+  const trimmed = name.trim();
+  if (!trimmed) return [];
+  const q = query(
+    collection(db, 'users'),
+    where('role', 'in', ['doctor', 'nurse', 'caregiver']),
+  );
+  const snap = await getDocs(q);
+  const lower = trimmed.toLowerCase();
+  return snap.docs
+    .map(d => d.data() as User)
+    .filter(u => !u.shiftManagerId && u.name.toLowerCase().includes(lower));
+}
+
 export async function getAllEmployees(): Promise<User[]> {
   const q = query(collection(db, 'users'), where('role', 'in', ['doctor', 'nurse', 'caregiver']));
   const snap = await getDocs(q);

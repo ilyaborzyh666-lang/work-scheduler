@@ -44,3 +44,5 @@ yarn-error.*
 # electron build output
 dist-electron/
 dist-web/
+
+.vercel

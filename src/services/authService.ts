@@ -4,6 +4,8 @@ import {
   signOut,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db } from './firebase';
@@ -47,36 +49,49 @@ export async function loginUser(email: string, password: string): Promise<User> 
   return snap.data() as User;
 }
 
+function isPopupSupported(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (window.location.protocol === 'file:') return false; // Electron
+  // במובייל (iOS/Android WebView) popup לא עובד
+  const ua = navigator.userAgent;
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(ua);
+  return !isMobile;
+}
+
 export async function loginWithGoogle(): Promise<User> {
   const provider = new GoogleAuthProvider();
 
-  // ב-Electron (file://) popup לא עובד — נשתמש ב-redirect
-  const isElectron = typeof window !== 'undefined' &&
-    window.location.protocol === 'file:';
-
-  if (isElectron) {
-    throw new Error('ELECTRON_ENV');
+  if (!isPopupSupported()) {
+    await signInWithRedirect(auth, provider);
+    // הדף יעשה redirect — הפונקציה לא תחזיר ערך כאן
+    return new Promise(() => {});
   }
 
   const cred = await signInWithPopup(auth, provider);
-  const snap = await getDoc(doc(db, 'users', cred.user.uid));
+  return _resolveGoogleUser(cred.user);
+}
 
-  if (snap.exists()) {
-    return snap.data() as User;
-  }
+export async function handleGoogleRedirectResult(): Promise<User | null> {
+  const result = await getRedirectResult(auth);
+  if (!result) return null;
+  return _resolveGoogleUser(result.user);
+}
 
-  // משתמש Google חדש — נוצר כעובד (caregiver) עד שמנהל ישנה תפקיד
+async function _resolveGoogleUser(firebaseUser: { uid: string; email: string | null; displayName: string | null }): Promise<User> {
+  const snap = await getDoc(doc(db, 'users', firebaseUser.uid));
+  if (snap.exists()) return snap.data() as User;
+
   const user: User = {
-    id: cred.user.uid,
-    email: cred.user.email ?? '',
-    name: cred.user.displayName ?? cred.user.email?.split('@')[0] ?? '',
+    id: firebaseUser.uid,
+    email: firebaseUser.email ?? '',
+    name: firebaseUser.displayName ?? firebaseUser.email?.split('@')[0] ?? '',
     role: 'caregiver',
     weeklyHours: 0,
     isBlocked: false,
     blockOverride: false,
     createdAt: new Date().toISOString(),
   };
-  await setDoc(doc(db, 'users', cred.user.uid), user);
+  await setDoc(doc(db, 'users', firebaseUser.uid), user);
   return user;
 }
 

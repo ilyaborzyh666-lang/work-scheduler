@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../services/firebase';
-import { fetchUserProfile } from '../services/authService';
+import { fetchUserProfile, handleGoogleRedirectResult } from '../services/authService';
 import { User } from '../types';
 
 interface AuthContextType {
@@ -21,6 +21,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // טפל בחזרה מ-Google redirect (מובייל)
+    handleGoogleRedirectResult().catch(() => {});
+
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
       try {
         if (firebaseUser) {

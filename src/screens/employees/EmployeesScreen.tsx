@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from '@react-navigation/native';
-import { getAllEmployees, getMyEmployees, setBlockOverride, assignEmployeeToShiftManager } from '../../services/userService';
+import { getAllEmployees, getMyEmployees, setBlockOverride, assignEmployeeToShiftManager, searchUnassignedEmployeesByName } from '../../services/userService';
 import { markEmployeeAvailableForLoan } from '../../services/loanService';
 import { useAuth } from '../../context/AuthContext';
 import { User, ShiftType, SHIFT_CONFIG, SHIFT_RULES } from '../../types';
@@ -22,7 +22,9 @@ export default function EmployeesScreen() {
   const { user } = useAuth();
   const [employees, setEmployees] = useState<User[]>([]);
   const [loading, setLoading] = useState(false);
-  const [addId, setAddId] = useState('');
+  const [searchName, setSearchName] = useState('');
+  const [searchResults, setSearchResults] = useState<User[]>([]);
+  const [searching, setSearching] = useState(false);
   const [adding, setAdding] = useState(false);
   const [loanEmployee, setLoanEmployee] = useState<User | null>(null);
   const [loanShiftType, setLoanShiftType] = useState<ShiftType>('morning');
@@ -45,17 +47,28 @@ export default function EmployeesScreen() {
 
   useFocusEffect(useCallback(() => { loadEmployees(); }, [user]));
 
-  async function handleAddEmployee() {
-    const id = addId.trim();
-    if (!id) return;
+  async function handleSearch() {
+    if (!searchName.trim()) return;
+    setSearching(true);
+    try {
+      const results = await searchUnassignedEmployeesByName(searchName);
+      setSearchResults(results);
+      if (results.length === 0) Alert.alert('לא נמצא', 'לא נמצאו עובדים פנויים עם שם זה');
+    } finally {
+      setSearching(false);
+    }
+  }
+
+  async function handleAddEmployee(employeeId: string, employeeName: string) {
     setAdding(true);
     try {
-      const result = await assignEmployeeToShiftManager(id, user!.id);
+      const result = await assignEmployeeToShiftManager(employeeId, user!.id);
       if (result.error) {
         Alert.alert('שגיאה', result.error);
       } else {
-        setAddId('');
-        Alert.alert('בוצע', 'העובד שויך אליך בהצלחה');
+        setSearchName('');
+        setSearchResults([]);
+        Alert.alert('בוצע', `${employeeName} שויך אליך בהצלחה`);
         loadEmployees();
       }
     } finally {
@@ -151,28 +164,47 @@ export default function EmployeesScreen() {
     <View style={styles.container}>
       {isShiftManager && (
         <View style={styles.addBox}>
-          <Text style={styles.addTitle}>הוסף עובד לפי ID</Text>
+          <Text style={styles.addTitle}>הוסף עובד לפי שם</Text>
           <View style={styles.addRow}>
             <TextInput
               style={styles.input}
-              placeholder="הכנס ID של עובד..."
+              placeholder="חפש שם עובד..."
               placeholderTextColor={colors.textMuted}
-              value={addId}
-              onChangeText={setAddId}
-              autoCapitalize="none"
+              value={searchName}
+              onChangeText={text => { setSearchName(text); setSearchResults([]); }}
               autoCorrect={false}
+              returnKeyType="search"
+              onSubmitEditing={handleSearch}
             />
             <TouchableOpacity
-              style={[styles.addBtn, (!addId.trim() || adding) && styles.addBtnDisabled]}
-              onPress={handleAddEmployee}
-              disabled={!addId.trim() || adding}
+              style={[styles.addBtn, (!searchName.trim() || searching) && styles.addBtnDisabled]}
+              onPress={handleSearch}
+              disabled={!searchName.trim() || searching}
             >
-              {adding
+              {searching
                 ? <ActivityIndicator size="small" color="#fff" />
-                : <Text style={styles.addBtnText}>הוסף</Text>
+                : <Text style={styles.addBtnText}>חפש</Text>
               }
             </TouchableOpacity>
           </View>
+          {searchResults.length > 0 && (
+            <View style={styles.searchResults}>
+              {searchResults.map(emp => (
+                <TouchableOpacity
+                  key={emp.id}
+                  style={styles.searchResultRow}
+                  onPress={() => handleAddEmployee(emp.id, emp.name)}
+                  disabled={adding}
+                >
+                  <View style={styles.searchResultInfo}>
+                    <Text style={styles.searchResultName}>{emp.name}</Text>
+                    <Text style={styles.searchResultEmail}>{emp.email}</Text>
+                  </View>
+                  <Text style={styles.searchResultAdd}>+ הוסף</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
       )}
 
@@ -318,6 +350,26 @@ const styles = StyleSheet.create({
   },
   addBtnDisabled: { opacity: 0.5 },
   addBtnText: { ...typography.bodyBold, color: '#fff' },
+  searchResults: {
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    overflow: 'hidden',
+  },
+  searchResultRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  searchResultInfo: { flex: 1, alignItems: 'flex-end' },
+  searchResultName: { ...typography.bodyBold, color: colors.textPrimary },
+  searchResultEmail: { ...typography.caption, color: colors.textMuted },
+  searchResultAdd: { ...typography.bodyBold, color: colors.accent, marginRight: spacing.sm },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   modal: {
     backgroundColor: colors.surface,
