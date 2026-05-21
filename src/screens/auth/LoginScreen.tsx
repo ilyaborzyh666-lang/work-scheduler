@@ -23,10 +23,11 @@ export default function LoginScreen({ navigation }: any) {
     setGoogleLoading(true);
     try {
       const user = await loginWithGoogle();
-      setUser(user);
+      // popup — מחזיר user ישירות
+      if (user) setUser(user);
+      // redirect — הדף יעשה מעבר ל-Google, onAuthStateChanged יטפל בחזרה
     } catch (e: any) {
       if (e?.message === 'ELECTRON_ENV') {
-        // ב-Electron — פתח דפדפן עם הכתובת של האפליקציה
         if (typeof window !== 'undefined' && (window as any).require) {
           const { shell } = (window as any).require('electron');
           shell.openExternal('http://localhost:8081');
