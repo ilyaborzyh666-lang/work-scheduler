@@ -40,7 +40,7 @@ export async function requestLeave(
   endDate: string,
   reason: string
 ): Promise<{ leave: LeaveRequest | null; error: string | null }> {
-  if (!auth.currentUser || auth.currentUser.uid !== employeeId) {
+  if (auth.currentUser && auth.currentUser.uid !== employeeId) {
     return { leave: null, error: 'לא מורשה לבצע פעולה זו' };
   }
   const validationError = validateLeaveRequest(startDate, endDate);
